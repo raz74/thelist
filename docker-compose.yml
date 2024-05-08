@@ -1,6 +1,17 @@
 version: "3.8"
 
 services:
+  thelist:
+    image: thelist:latest
+    environment:
+      - SERVER_ADDRESS=:8080
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_DB=thelist
+    ports:
+      - "8080:8080"
   postgres:
     image: postgres:latest
     restart: unless-stopped
