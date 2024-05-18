@@ -3,14 +3,20 @@ package notification
 import (
 	ginErr "TheList/utilize/error"
 	"context"
+	"log"
+	"sync"
 	"time"
 )
 
-const notifChanBufSize = 50
+const (
+	notifChanBufSize = 50
+	numHandlers      = 5
+)
 
 type ShutdownFunc func()
 
 type Service struct {
+	sync.WaitGroup
 	notifChan chan Notification
 	repo      IRepository
 }
@@ -24,6 +30,7 @@ func (s *Service) AsyncSend(m IMessage) {
 }
 
 func (s *Service) Send(m IMessage) {
+	defer func() { recover() }()
 	s.notifChan <- Notification{
 		Id:      m.GetId(),
 		Message: m.GetMessage(),
@@ -31,20 +38,28 @@ func (s *Service) Send(m IMessage) {
 	}
 }
 
-func (s *Service) Start() ShutdownFunc {
+func (s *Service) Start() {
 	ctx := context.Background()
-	go s.handle(ctx)
-	return func() {
-		ctx.Done()
+	for i := 0; i < numHandlers; i++ {
+		go s.handle(ctx)
+		s.Add(1)
 	}
+}
+
+func (s *Service) Shutdown() {
+	log.Println("exiting notification service")
+	close(s.notifChan)
+	s.Wait()
+	log.Println("notification service exited")
 }
 
 func (s *Service) handle(ctx context.Context) {
 	for notifMessage := range s.notifChan {
 		if err := s.handleMessage(ctx, notifMessage); err != nil {
-			// todo
+			log.Println("err in handle notification message:", err)
 		}
 	}
+	s.Done()
 }
 
 func (s *Service) handleMessage(ctx context.Context, message Notification) error {

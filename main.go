@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -42,9 +44,16 @@ func Init() {
 
 	restaurant.InitHandler(ginEngine.GetEngine(), restaurantService)
 
-	shutdownNotification := notificationService.Start()
-	if err := ginEngine.Start(); err != nil {
-		log.Fatal(err)
-	}
-	shutdownNotification()
+	notificationService.Start()
+	ginEngine.Start()
+
+	// graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down service ...")
+
+	ginEngine.Shutdown()
+	notificationService.Shutdown()
 }
